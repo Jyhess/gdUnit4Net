@@ -11,14 +11,14 @@
   <ItemGroup>
     <!-- Microsoft Test Platform -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftNETTestSdkVersion)"/>
-    <PackageVersion Include="Microsoft.TestPlatform.ObjectModel" Version="18.11.0"/>
-    <PackageVersion Include="Microsoft.TestPlatform.AdapterUtilities" Version="18.11.0"/>
+    <PackageVersion Include="Microsoft.TestPlatform.ObjectModel" Version="18.12.0"/>
+    <PackageVersion Include="Microsoft.TestPlatform.AdapterUtilities" Version="18.12.0"/>
     <PackageVersion Include="MSTest.TestAdapter" Version="$(MSTestTestFrameworkVersion)"/>
     <PackageVersion Include="MSTest.TestFramework" Version="$(MSTestTestFrameworkVersion)"/>
 
     <!-- Roslyn/Code Analysis (compatible with all target frameworks) -->
     <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="$(MicrosoftCodeAnalysisAnalyzersVersion)"/>
-    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0"/>
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.12.0"/>
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0"/>
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Analyzer.Testing.MSTest" Version="1.1.2"/>
 
