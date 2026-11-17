@@ -30,16 +30,16 @@ internal class InOutPipeProxy<TPipe> : IAsyncDisposable
         Pipe = pipe;
     }
 
+    /// <summary>
+    ///     Gets the name of the pipe of the Godot runtime: the one its test host gave, else the default one.
+    /// </summary>
+    protected static string RuntimePipeName => Environment.GetEnvironmentVariable(PIPE_NAME_VARIABLE) ?? DEFAULT_PIPE_NAME;
+
     protected ITestEngineLogger Logger { get; }
 
     protected bool IsConnected => Pipe.IsConnected;
 
     protected TPipe Proxy => Pipe;
-
-    /// <summary>
-    ///     Gets the name of the pipe of the Godot runtime: the one its test host gave, else the default one.
-    /// </summary>
-    protected static string RuntimePipeName => Environment.GetEnvironmentVariable(PIPE_NAME_VARIABLE) ?? DEFAULT_PIPE_NAME;
 
     // ReSharper disable once StaticMemberInGenericType
 #pragma warning disable CA2326, CA2327
@@ -59,6 +59,18 @@ internal class InOutPipeProxy<TPipe> : IAsyncDisposable
         await Pipe.DisposeAsync()
             .ConfigureAwait(false);
         GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    ///     Names the pipe of this test host, one per process so that test runs at once do not collide, and gives the name
+    ///     to the Godot runtime it starts through the environment.
+    /// </summary>
+    /// <returns>The name of the pipe.</returns>
+    protected static string NewTestHostPipeName()
+    {
+        var name = $"gdunit4-{Environment.ProcessId}";
+        Environment.SetEnvironmentVariable(PIPE_NAME_VARIABLE, name);
+        return name;
     }
 
     protected async Task<object?> ReadInData(CancellationToken cancellationToken)
@@ -143,18 +155,6 @@ internal class InOutPipeProxy<TPipe> : IAsyncDisposable
         await Pipe
             .FlushAsync()
             .ConfigureAwait(false);
-    }
-
-    /// <summary>
-    ///     Names the pipe of this test host, one per process so that test runs at once do not collide, and gives the name
-    ///     to the Godot runtime it starts through the environment.
-    /// </summary>
-    /// <returns>The name of the pipe.</returns>
-    protected static string NewTestHostPipeName()
-    {
-        var name = $"gdunit4-{Environment.ProcessId}";
-        Environment.SetEnvironmentVariable(PIPE_NAME_VARIABLE, name);
-        return name;
     }
 
     private static string SerializeObject<TObject>(TObject data)
