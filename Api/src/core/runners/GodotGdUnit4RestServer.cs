@@ -19,7 +19,7 @@ internal sealed class GodotGdUnit4RestServer : InOutPipeProxy<NamedPipeServerStr
     private readonly SemaphoreSlim processLock = new(1, 1);
 
     public GodotGdUnit4RestServer(ITestEngineLogger logger)
-        : base(new NamedPipeServerStream(PIPE_NAME, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous), logger)
+        : base(new NamedPipeServerStream(RuntimePipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous), logger)
         => Logger.LogInfo("GodotGdUnit4RestApi:: Starting GdUnit4 RestApi Server.");
 
     public bool IsFailed { get; set; }

@@ -1,3 +1,10 @@
+v5.0.1-katrix1
+
+Fork of v5.0.0 (https://github.com/Jyhess/gdUnit4Net, branch katrix/5.0), for Godot 4.7 projects.
+* One named pipe per test host (`gdunit4-<process id>`), given to the Godot runtime by the environment variable
+  `GDUNIT4_PIPE_NAME`: test runs at once, from several test hosts, no longer collide on `gdunit4-message-pipe`.
+  Upstream fixes it from v5.1.0 (GD-532), which needs Godot 4.7 and changes the scene runner.
+
 v5.0.0
 
 ## Major Architecture Overhaul

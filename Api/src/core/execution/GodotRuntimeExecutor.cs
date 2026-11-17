@@ -30,7 +30,7 @@ using static Api.ReportType;
 internal sealed class GodotRuntimeExecutor : InOutPipeProxy<NamedPipeClientStream>, ICommandExecutor
 {
     public GodotRuntimeExecutor(ITestEngineLogger logger)
-        : base(new NamedPipeClientStream(".", PIPE_NAME, PipeDirection.InOut, PipeOptions.Asynchronous, TokenImpersonationLevel.Impersonation), logger)
+        : base(new NamedPipeClientStream(".", NewTestHostPipeName(), PipeDirection.InOut, PipeOptions.Asynchronous, TokenImpersonationLevel.Impersonation), logger)
         => Logger.LogInfo("Starting GodotGdUnit4RestClient.");
 
     public async Task StartAsync()

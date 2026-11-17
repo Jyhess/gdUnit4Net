@@ -1,0 +1,29 @@
+# Builds the gdUnit4.api package of this fork for Katrix and attaches it to a GitHub release of the tag.
+# Run by pushing a tag katrix-v<version> on branch katrix/5.0; the version is GdUnitAPIVersion of ProjectVersions.props.
+name: Katrix package
+
+on:
+  push:
+    tags: ["katrix-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      # As upstream's ci-pr.yml: the build packs the API (GeneratePackageOnBuild) into Api/nupkg/.
+      - name: Build the package
+        run: dotnet build Api/GdUnit4Api.csproj -c Release /p:EnforceCodeStyleInBuild=false /p:TreatWarningsAsErrors=false
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls Api/nupkg/*.nupkg
+          gh release create "$GITHUB_REF_NAME" Api/nupkg/*.nupkg --title "$GITHUB_REF_NAME" \
+            --notes "gdUnit4.api built from $GITHUB_SHA: one named pipe per test host (Api/ReleaseNotes.txt)."
