@@ -30,12 +30,12 @@ internal sealed class TestCaseExecutionStage : ExecutionStage<TestCaseAttribute>
             .Gc()
             .ConfigureAwait(true);
         if (context.MemoryPool.OrphanCount > 0)
-            context.ReportCollector.PushFront(new TestReport(Warning, context.CurrentTestCase?.Line ?? 0, ReportOrphans(context)));
+            context.ReportCollector.PushFront(new TestReport(Failure, context.CurrentTestCase?.Line ?? 0, ReportOrphans(context)));
     }
 
     private static string ReportOrphans(ExecutionContext context) =>
         $"""
-         {AssertFailures.FormatValue("WARNING:", AssertFailures.WARN_COLOR, false)}
+         {AssertFailures.FormatValue("FAILED:", AssertFailures.ERROR_COLOR, false)}
              Detected <{context.MemoryPool.OrphanCount}> orphan nodes during test execution!
          """;
 }

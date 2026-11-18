@@ -40,9 +40,10 @@ internal class MemoryPool
         var currentPool = CurrentPool.Value;
         currentPool?.registeredObjects.ForEach(FreeInstance);
         currentPool?.registeredObjects.Clear();
-        StopMonitoring();
+        // Katrix: waits for the frame first, so that nodes freed by QueueFree are not counted as orphans.
         if (OrphanMonitor != null)
             _ = await GodotObjectExtensions.SyncProcessFrame;
+        StopMonitoring();
     }
 
     public void StopMonitoring() => OrphanMonitor?.Stop();

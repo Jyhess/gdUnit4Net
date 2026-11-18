@@ -14,7 +14,7 @@ using Godot.Collections;
 internal static class AssertFailures
 {
     internal const string WARN_COLOR = "#EFF883";
-    private const string ERROR_COLOR = "#CD5C5C";
+    internal const string ERROR_COLOR = "#CD5C5C";
     private const string VALUE_COLOR = "#1E90FF";
 
     public static string IsEqual(object? current, object? expected) =>

@@ -31,7 +31,7 @@ internal class AfterExecutionStage : ExecutionStage<AfterAttribute>
             .Gc()
             .ConfigureAwait(true);
         if (context.MemoryPool.OrphanCount > 0)
-            context.ReportCollector.PushFront(new TestReport(Warning, 0, ReportOrphans(context)));
+            context.ReportCollector.PushFront(new TestReport(Failure, 0, ReportOrphans(context)));
         context.FireAfterEvent();
     }
 
@@ -55,14 +55,14 @@ internal class AfterExecutionStage : ExecutionStage<AfterAttribute>
         if (beforeAttribute != null && afterAttributes != null)
         {
             return $"""
-                    {AssertFailures.FormatValue("WARNING:", AssertFailures.WARN_COLOR, false)}
+                    {AssertFailures.FormatValue("FAILED:", AssertFailures.ERROR_COLOR, false)}
                         Detected <{context.MemoryPool.OrphanCount}> orphan nodes during test suite setup stage!
                         Check [b]{beforeAttribute.Name + ":" + beforeAttribute.Line}[/b] and [b]{afterAttributes.Name + ":" + afterAttributes.Line}[/b] for unfreed instances!
                     """;
         }
 
         return $"""
-                {AssertFailures.FormatValue("WARNING:", AssertFailures.WARN_COLOR, false)}
+                {AssertFailures.FormatValue("FAILED:", AssertFailures.ERROR_COLOR, false)}
                     Detected <{context.MemoryPool.OrphanCount}> orphan nodes during test suite setup stage!
                     Check [b]{(beforeAttribute != null ? beforeAttribute.Name + ":" + beforeAttribute.Line : afterAttributes?.Name + ":" + afterAttributes?.Line)}[/b] for unfreed instances!
                 """;

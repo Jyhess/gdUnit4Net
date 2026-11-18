@@ -1,3 +1,8 @@
+v5.0.1-katrix2
+
+* Orphan nodes left by a test, its setup or its suite's setup fail it, instead of a warning.
+* Orphan nodes are counted after the frame that frees the nodes given to QueueFree.
+
 v5.0.1-katrix1
 
 Fork of v5.0.0 (https://github.com/Jyhess/gdUnit4Net, branch katrix/5.0), for Godot 4.7 projects.
