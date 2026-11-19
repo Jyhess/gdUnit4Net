@@ -1,3 +1,9 @@
+v5.0.1-katrix3
+
+* Windows stdout capture: each capture reads its own pipe and waits for its reader at its end. The reader threads
+  of previous captures no longer pile up blocked on the pipe, nor read it once closed, which crashed the test host
+  with an ObjectDisposedException.
+
 v5.0.1-katrix2
 
 * Orphan nodes left by a test, its setup or its suite's setup fail it, instead of a warning.

@@ -4,154 +4,106 @@
 namespace GdUnit4.Core.Hooks;
 
 using System.Diagnostics.CodeAnalysis;
+using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Text;
 
-using Microsoft.Win32.SafeHandles;
-
-[SuppressMessage("Style", "IDE1006", Justification = "Unix system call names follow C naming conventions")]
-[SuppressMessage(
-    "StyleCop.CSharp.NamingRules",
-    "SA1300:Element should begin with upper-case letter",
-    Justification = "Unix system call names must match libc function names exactly")]
 [SuppressMessage(
     "StyleCop.CSharp.OrderingRules",
     "SA1201:Elements should appear in the correct order",
     Justification = "P/Invoke declarations are grouped together for clarity at the end of the class")]
+[SuppressMessage(
+    "Usage",
+    "CA2216:Disposable types should declare finalizer",
+    Justification = "The original stdout handle belongs to the process, not to this hook")]
 internal sealed class WindowsStdOutHook : IStdOutHook
 {
     private const int STD_OUTPUT_HANDLE = -11;
 
+    // A process that inherited the pipe's write end keeps it open: the reader then stops at the next capture's end.
+    private static readonly TimeSpan ReaderStopTimeout = TimeSpan.FromSeconds(1);
+
     private readonly IntPtr originalStdOutHandle;
-    private readonly SafeFileHandle pipeReadHandle;
-    private readonly SafeFileHandle pipeWriteHandle;
     private readonly StdOutConsoleHook stdOutHook = new();
-    private bool disposed;
-    private IntPtr readEvent;
+    private AnonymousPipeServerStream? pipe;
     private Thread? readThread;
+    private bool disposed;
 
     public WindowsStdOutHook()
     {
         originalStdOutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
         if (originalStdOutHandle == IntPtr.Zero)
             throw new InvalidOperationException("Failed to get original stdout handle.");
-
-        if (!CreatePipe(out pipeReadHandle, out pipeWriteHandle, IntPtr.Zero, 0))
-            throw new InvalidOperationException("Failed to create pipe.");
-
-        readEvent = CreateEvent(IntPtr.Zero, true, false, string.Empty);
-        if (readEvent == IntPtr.Zero)
-            throw new InvalidOperationException("Failed to create read event for asynchronous reading.");
     }
+
+    /// <summary>
+    ///     Gets a value indicating whether the thread reading the redirected stdout still runs.
+    /// </summary>
+    internal bool IsReading => readThread?.IsAlive ?? false;
 
     public void Dispose()
     {
-        Dispose(true);
-        GC.SuppressFinalize(this);
+        if (disposed)
+            return;
+        StopCapture();
+        stdOutHook.Dispose();
+        disposed = true;
     }
 
     public void StartCapture()
     {
-        // Redirect stdout to the pipe
-        if (!SetStdHandle(STD_OUTPUT_HANDLE, pipeWriteHandle.DangerousGetHandle()))
+        ObjectDisposedException.ThrowIf(disposed, this);
+        StopCapture();
+
+        // Each capture has its own pipe: its reader ends when the capture closes the pipe's write end.
+        pipe = new AnonymousPipeServerStream(PipeDirection.In, HandleInheritability.None);
+        if (!SetStdHandle(STD_OUTPUT_HANDLE, pipe.ClientSafePipeHandle.DangerousGetHandle()))
+        {
+            pipe.Dispose();
+            pipe = null;
             throw new InvalidOperationException("Failed to redirect stdout to pipe.");
+        }
+
         stdOutHook.StartCapture();
-        readThread = new Thread(ReadPipeOutput);
+        var capturePipe = pipe;
+        readThread = new Thread(() => ReadPipeOutput(capturePipe)) { IsBackground = true, Name = "GdUnit4 stdout reader" };
         readThread.Start();
     }
 
     public void StopCapture()
     {
-        stdOutHook.StopCapture();
-        readThread?.Interrupt();
-        readThread = null;
+        if (pipe is null)
+            return;
 
-        // Restore original stdout
         _ = SetStdHandle(STD_OUTPUT_HANDLE, originalStdOutHandle);
+
+        // Closing the write end lets the reader drain what was written, then read the end of the stream.
+        pipe.DisposeLocalCopyOfClientHandle();
+        _ = readThread?.Join(ReaderStopTimeout);
+        readThread = null;
+        stdOutHook.StopCapture();
+
+        // A reader still blocked gets an ObjectDisposedException at its next read, which ends it.
+        pipe.Dispose();
+        pipe = null;
     }
 
     public string GetCapturedOutput() => stdOutHook.GetCapturedOutput();
 
-    // Add finalizer
-    ~WindowsStdOutHook()
-        => Dispose(false);
-
-    private void Dispose(bool disposing)
+    private static void ReadPipeOutput(Stream capturePipe)
     {
-        if (!disposed)
-        {
-            if (disposing)
-            {
-                // Dispose of managed resources
-                stdOutHook.Dispose();
-                pipeReadHandle.Dispose();
-                pipeWriteHandle.Dispose();
-            }
-
-            // Dispose unmanaged resources
-            if (readEvent != IntPtr.Zero)
-            {
-                _ = CloseHandle(readEvent);
-                readEvent = IntPtr.Zero;
-            }
-
-            disposed = true;
-        }
-    }
-
-    private void ReadPipeOutput()
-    {
-        var buffer = new byte[4096];
-        var overlapped = new Overlapped { HEvent = readEvent };
-
+        using var reader = new StreamReader(capturePipe, Encoding.UTF8, false, 4096, leaveOpen: true);
+        var buffer = new char[4096];
         try
         {
-            while (true)
-            {
-                if (ReadFile(pipeReadHandle, buffer, (uint)buffer.Length, out var bytesRead, ref overlapped))
-                    ProcessReadData(buffer, bytesRead);
-                else
-                {
-                    var error = Marshal.GetLastWin32Error();
-
-                    // ERROR_IO_PENDING
-                    if (error == 997)
-                    {
-                        // WAIT_OBJECT_0
-                        if (WaitForSingleObject(readEvent, 100) == 0)
-                        {
-                            if (GetOverlappedResult(pipeReadHandle, ref overlapped, out bytesRead, false))
-                                ProcessReadData(buffer, bytesRead);
-                        }
-                    }
-                    else
-                    {
-                        // Handle other errors
-                        break;
-                    }
-                }
-            }
+            int read;
+            while ((read = reader.Read(buffer, 0, buffer.Length)) > 0)
+                Console.Write(buffer, 0, read);
         }
-        catch (ThreadInterruptedException)
+        catch (Exception e) when (e is ObjectDisposedException or IOException)
         {
-            // Normal exit via StopCapture
+            // The capture closed the pipe while this thread was reading: what it wrote after its end is not captured.
         }
-    }
-
-    private void ProcessReadData(byte[] buffer, uint bytesRead)
-    {
-        if (bytesRead > 0)
-            Console.Write(Encoding.UTF8.GetString(buffer, 0, (int)bytesRead));
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct Overlapped
-    {
-        public IntPtr Internal;
-        public IntPtr InternalHigh;
-        public int Offset;
-        public int OffsetHigh;
-        public IntPtr HEvent;
     }
 
 #pragma warning disable SYSLIB1054
@@ -162,29 +114,5 @@ internal sealed class WindowsStdOutHook : IStdOutHook
     [DllImport("kernel32.dll", SetLastError = true)]
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32 | DllImportSearchPath.UserDirectories)]
     private static extern bool SetStdHandle(int nStdHandle, IntPtr hHandle);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    [DefaultDllImportSearchPaths(DllImportSearchPath.System32 | DllImportSearchPath.UserDirectories)]
-    private static extern bool CreatePipe(out SafeFileHandle hReadPipe, out SafeFileHandle hWritePipe, IntPtr lpPipeAttributes, uint nSize);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    [DefaultDllImportSearchPaths(DllImportSearchPath.System32 | DllImportSearchPath.UserDirectories)]
-    private static extern bool ReadFile(SafeFileHandle hFile, [Out] byte[] lpBuffer, uint nNumberOfBytesToRead, out uint lpNumberOfBytesRead, ref Overlapped lpOverlapped);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    [DefaultDllImportSearchPaths(DllImportSearchPath.System32 | DllImportSearchPath.UserDirectories)]
-    private static extern bool GetOverlappedResult(SafeFileHandle hFile, ref Overlapped lpOverlapped, out uint lpNumberOfBytesTransferred, bool bWait);
-
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    [DefaultDllImportSearchPaths(DllImportSearchPath.System32 | DllImportSearchPath.UserDirectories)]
-    private static extern IntPtr CreateEvent(IntPtr lpEventAttributes, bool bManualReset, bool bInitialState, string lpName);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    [DefaultDllImportSearchPaths(DllImportSearchPath.System32 | DllImportSearchPath.UserDirectories)]
-    private static extern bool CloseHandle(IntPtr hObject);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    [DefaultDllImportSearchPaths(DllImportSearchPath.System32 | DllImportSearchPath.UserDirectories)]
-    private static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
 #pragma warning restore SYSLIB1054
 }
