@@ -50,7 +50,8 @@ public class InOutPipeProxyTest
 
     private static async Task<(NamedPipeServerStream Server, NamedPipeClientStream Client)> ConnectedPipes()
     {
-        var name = $"gdunit4-test-{Guid.NewGuid():N}";
+        // Short: on macOS, the pipe is a domain socket under a long temp folder, whose path has at most 104 characters.
+        var name = $"gdunit4-t-{Guid.NewGuid().ToString("N")[..8]}";
         var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
         var client = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous);
         await Task.WhenAll(server.WaitForConnectionAsync(), client.ConnectAsync(1000));
