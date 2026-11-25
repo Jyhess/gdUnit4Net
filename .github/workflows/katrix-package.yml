@@ -10,7 +10,25 @@ permissions:
   contents: write
 
 jobs:
+  # The pipe tests need no Godot; they check on Unix how a pipe closed by the other side is read.
+  pipe-tests:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Run the pipe tests
+        run: >
+          dotnet test Api.Test/GdUnit4ApiTest.csproj --settings Api.Test/.runsettings-ci
+          --filter "FullyQualifiedName~InOutPipeProxyTest"
+          /p:EnforceCodeStyleInBuild=false /p:TreatWarningsAsErrors=false
+
   package:
+    needs: pipe-tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

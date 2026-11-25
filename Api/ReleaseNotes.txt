@@ -1,3 +1,9 @@
+v5.0.1-katrix4
+
+* A pipe closed by the other side ends the read at once: the test host reports the running test as interrupted
+  when its Godot runtime disappears, and the Godot runtime stops reading commands when its test host disappears.
+  On Unix, the read looped on 0 bytes at full load; on Windows, the test host looped on empty messages.
+
 v5.0.1-katrix3
 
 * Windows stdout capture: each capture reads its own pipe and waits for its reader at its end. The reader threads
