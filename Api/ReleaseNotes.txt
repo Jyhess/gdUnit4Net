@@ -56,6 +56,9 @@ v5.1.0
           The installed runner scene derives from `SceneTree`, an outdated runner scene is replaced on the next test run.
 * GD-XXX: Fixing the Godot runtime running forever when its test host is gone (killed, test session timeout, crash).
           The Godot runtime watches its test host from its start and ends with the exit code 101 once the test host has exited.
+* GD-XXX: Fixing the pipe read looping forever when the other side of the pipe is gone, a read of 0 bytes or a disconnected pipe now ends it.
+          The test host reports the running test as interrupted when the Godot runtime disappears, instead of looping at full load on Unix
+          and on empty messages on Windows.
 
 ✨ Improvements
 * GD-311: Verify the Godot binary has C# support before running godot runtime tests to avoid invalid test execution.
